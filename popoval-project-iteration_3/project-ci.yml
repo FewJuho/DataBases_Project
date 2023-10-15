@@ -1,0 +1,114 @@
+image: python:3.9-slim
+
+# стейджи пайплайна
+stages:
+  - tasks # у этого стейджа есть стэпы: 'tasks from 3rd to 11th' & 'task 12th'
+
+# внутри пайплайна автоматически поднимается
+# пустая база Postgres (каждый раз на новый степ)
+services:
+  - name: postgres:15-alpine
+    alias: postgres
+
+workflow:
+  rules:
+    - when: always
+
+
+
+variables:
+#  переменные окружения для Postgres
+  POSTGRES_DB: postgres
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: password
+  POSTGRES_HOST_AUTH_METHOD: trust
+
+#  переменные окружения для вспомогательного
+#  скрипта utils/pypsql.py и тестов
+  DBNAME: postgres
+  DBHOST: postgres
+  DBPORT: 5432
+  DBUSER: postgres
+  DBPASSWORD: password
+
+#  аккуратное формирование всяких абсолютных
+#  путей к файлам и директориям
+#  у вас будет ${PROJECT_DIR} тождественно равен ${CI_PROJECT_DIR}
+  PROJECT_DIR: ${CI_PROJECT_DIR}
+  ANALYSIS_DIR: ${PROJECT_DIR}/analysis
+  SCRIPTS_DIR: ${PROJECT_DIR}/scripts
+  TESTS_DIR: ${PROJECT_DIR}/tests
+  UTILS_DIR: ${PROJECT_DIR}/utils
+  PYPSQL: ${UTILS_DIR}/pypsql.py
+
+#  переменные для цвета в консоли (можете
+#  использовать какие-то другие свои)
+  NO_COLOUR: '\033[0m'
+  LIGHT_RED: '\033[1;31m'
+
+
+.setup:
+  before_script:
+    - pip install -r ${PROJECT_DIR}/requirements.txt > /dev/null 2> /dev/null
+
+
+tasks from 3rd to 11th:
+  stage: tasks
+  extends:
+    - .setup
+  script:
+    - echo -e "${LIGHT_RED}>>> Task №3 <<<${NO_COLOUR}"
+    - python3 ${PYPSQL} --file="${SCRIPTS_DIR}/ddl_script.sql" --cat
+    
+    - echo -e "${LIGHT_RED}>>> Task №4-5 <<<${NO_COLOUR}"
+    - python3 ${PYPSQL} --file="${SCRIPTS_DIR}/4_iteration(insertions).sql"
+    - echo "Table 'Nba_Schedule.Player' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.Player" --verbose
+    - echo "Table 'Nba_Schedule.City' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.City" --verbose
+    - echo "Table 'Nba_Schedule.Sponsor' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.Sponsor" --verbose
+    - echo "Table 'Nba_Schedule.Coach' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.Coach" --verbose
+    - echo "Table 'Nba_Schedule.Players_Lineup' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.Players_Lineup" --verbose
+    - echo "Table 'Nba_Schedule.History_Players_Lineup' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.History_Players_Lineup" --verbose
+    - echo "Table 'Nba_Schedule.Team' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.Team" --verbose
+    - echo "Table 'Nba_Schedule.Match' contains rows:"
+    - python3 ${PYPSQL} --sql="SELECT * FROM Nba_Schedule.Match" --verbose
+
+    - python3 ${PYPSQL} --file="${SCRIPTS_DIR}/5_iteration_(CRUD).sql" --cat
+
+    - echo -e "${LIGHT_RED}>>> Task №6-7 <<<${NO_COLOUR}"
+    - SCRIPT_PATH="${SCRIPTS_DIR}/6_iteration(select)/6_iteration(select)_1.sql" pytest ${TESTS_DIR}/6_iter_test_1.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/6_iteration(select)/6_iteration(select)_2.sql" pytest ${TESTS_DIR}/6_iter_test_2.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/6_iteration(select)/6_iteration(select)_3.sql" pytest ${TESTS_DIR}/6_iter_test_3.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/6_iteration(select)/6_iteration(select)_4.sql" pytest ${TESTS_DIR}/6_iter_test_4.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/6_iteration(select)/6_iteration(select)_5.sql" pytest ${TESTS_DIR}/6_iter_test_5.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/6_iteration(select)/6_iteration(select)_6.sql" pytest ${TESTS_DIR}/6_iter_test_6.py
+
+    - echo -e "${LIGHT_RED}>>> Task №8 <<<${NO_COLOUR}"
+    - python3 ${PYPSQL} --file="${SCRIPTS_DIR}/8_iteration_indexes.sql" --cat
+
+
+    - echo -e "${LIGHT_RED}>>> Task №9 <<<${NO_COLOUR}"
+    - SCRIPT_PATH="${SCRIPTS_DIR}/9_iteration_separate_views/9_iteration_view_1.sql" pytest ${TESTS_DIR}/9_iter_test_1.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/9_iteration_separate_views/9_iteration_view_2.sql" pytest ${TESTS_DIR}/9_iter_test_2.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/9_iteration_separate_views/9_iteration_view_3.sql" pytest ${TESTS_DIR}/9_iter_test_3.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/9_iteration_separate_views/9_iteration_view_4.sql" pytest ${TESTS_DIR}/9_iter_test_4.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/9_iteration_separate_views/9_iteration_view_5.sql" pytest ${TESTS_DIR}/9_iter_test_5.py
+    - SCRIPT_PATH="${SCRIPTS_DIR}/9_iteration_separate_views/9_iteration_view_6.sql" pytest ${TESTS_DIR}/9_iter_test_6.py
+
+    - echo -e "${LIGHT_RED}>>> Task №10 <<<${NO_COLOUR}"
+    - python3 ${PYPSQL} --file="${SCRIPTS_DIR}/10_iteration_functions.sql" --cat
+
+
+# task 12th:
+#   stage: tasks
+#   extends:
+#     - .setup
+#   script:
+#     - python3 ${PYPSQL} --file="${SCRIPTS_DIR}/cafe_ddl.sql"
+#     - python3 ${ANALYSIS_DIR}/analysis.py
